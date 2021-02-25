@@ -185,8 +185,6 @@ struct vkd3d_instance
 
     uint64_t config_flags;
 
-    VkDebugUtilsMessengerEXT vk_debug_callback;
-
     LONG refcount;
 };
 

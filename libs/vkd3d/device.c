@@ -384,31 +384,6 @@ static VkBool32 VKAPI_PTR vkd3d_debug_messenger_callback(
     return VK_FALSE;
 }
 
-static void vkd3d_init_debug_messenger_callback(struct vkd3d_instance *instance)
-{
-    const struct vkd3d_vk_instance_procs *vk_procs = &instance->vk_procs;
-    VkDebugUtilsMessengerCreateInfoEXT callback_info;
-    VkInstance vk_instance = instance->vk_instance;
-    VkDebugUtilsMessengerEXT callback;
-    VkResult vr;
-
-    callback_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    callback_info.pNext = NULL;
-    callback_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
-                                    VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
-    callback_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
-    callback_info.pfnUserCallback = vkd3d_debug_messenger_callback;
-    callback_info.pUserData = NULL;
-    callback_info.flags = 0;
-    if ((vr = VK_CALL(vkCreateDebugUtilsMessengerEXT(vk_instance, &callback_info, NULL, &callback)) < 0))
-    {
-        WARN("Failed to create debug report callback, vr %d.\n", vr);
-        return;
-    }
-
-    instance->vk_debug_callback = callback;
-}
-
 static const struct vkd3d_debug_option vkd3d_config_options[] =
 {
     /* Enable Vulkan debug extensions. */
@@ -467,6 +442,7 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
     const struct vkd3d_optional_instance_extensions_info *optional_extensions;
     const char *debug_layer_name = "VK_LAYER_KHRONOS_validation";
     const struct vkd3d_application_info *vkd3d_application_info;
+    VkDebugUtilsMessengerCreateInfoEXT callback_info;
     bool *user_extension_supported = NULL;
     VkApplicationInfo application_info;
     VkInstanceCreateInfo instance_info;
@@ -610,6 +586,20 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
         vkd3d_free(layers);
     }
 
+    if (instance->vk_info.EXT_debug_utils && (instance->config_flags & VKD3D_CONFIG_FLAG_VULKAN_DEBUG))
+    {
+        callback_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        callback_info.pNext = NULL;
+        callback_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT |
+                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT;
+        callback_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+        callback_info.pfnUserCallback = vkd3d_debug_messenger_callback;
+        callback_info.pUserData = NULL;
+        callback_info.flags = 0;
+
+        vk_prepend_struct(&instance_info, &callback_info);
+    }
+
     vr = vk_global_procs->vkCreateInstance(&instance_info, NULL, &vk_instance);
     vkd3d_free((void *)extensions);
     if (vr < 0)
@@ -638,11 +628,6 @@ static HRESULT vkd3d_instance_init(struct vkd3d_instance *instance,
             VK_VERSION_MINOR(loader_version));
 
     instance->refcount = 1;
-
-    instance->vk_debug_callback = VK_NULL_HANDLE;
-    if (instance->vk_info.EXT_debug_utils && (instance->config_flags & VKD3D_CONFIG_FLAG_VULKAN_DEBUG))
-        vkd3d_init_debug_messenger_callback(instance);
-
 
 #ifdef VKD3D_ENABLE_RENDERDOC
     /* Need to init this sometime after creating the instance so that the layer has loaded. */
@@ -694,9 +679,6 @@ static void vkd3d_destroy_instance(struct vkd3d_instance *instance)
 {
     const struct vkd3d_vk_instance_procs *vk_procs = &instance->vk_procs;
     VkInstance vk_instance = instance->vk_instance;
-
-    if (instance->vk_debug_callback)
-        VK_CALL(vkDestroyDebugUtilsMessengerEXT(vk_instance, instance->vk_debug_callback, NULL));
 
     VK_CALL(vkDestroyInstance(vk_instance, NULL));
 
