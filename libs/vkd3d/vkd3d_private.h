@@ -3065,6 +3065,8 @@ struct d3d12_device
     d3d12_device_vkd3d_ext_iface ID3D12DeviceExt_iface;
     LONG refcount;
 
+    struct ID3D12Device9Vtbl d3d12_device_vtbl;
+
     VkDevice vk_device;
     uint32_t api_version;
     VkPhysicalDevice vk_physical_device;
@@ -3148,19 +3150,8 @@ static inline struct d3d12_device *unsafe_impl_from_ID3D12Device(d3d12_device_if
 
 static inline struct d3d12_device *impl_from_ID3D12Device(d3d12_device_iface *iface)
 {
-    extern CONST_VTBL struct ID3D12Device9Vtbl d3d12_device_vtbl;
-#ifdef VKD3D_ENABLE_PROFILING
-    extern CONST_VTBL struct ID3D12Device9Vtbl d3d12_device_vtbl_profiled;
-#endif
     if (!iface)
         return NULL;
-
-#ifdef VKD3D_ENABLE_PROFILING
-    assert(iface->lpVtbl == &d3d12_device_vtbl ||
-           iface->lpVtbl == &d3d12_device_vtbl_profiled);
-#else
-    assert(iface->lpVtbl == &d3d12_device_vtbl);
-#endif
 
     return CONTAINING_RECORD(iface, struct d3d12_device, ID3D12Device_iface);
 }
